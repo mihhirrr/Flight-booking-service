@@ -1,0 +1,8 @@
+Bookings
+id INT - PK 
+userid INT - FK - User model
+flightId INT - FK - Flights model
+airplaneId INT - FK - Airplane model
+status - ENUM -   [ 'CONFIRMED', 'CANCELLED', 'PENDING' ]
+totalSeats - INT
+Total_Charges INT

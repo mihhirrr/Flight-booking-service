@@ -6,3 +6,13 @@ airplaneId INT - FK - Airplane model
 status - ENUM -   [ 'CONFIRMED', 'CANCELLED', 'PENDING' ]
 totalSeats - INT
 Total_Charges INT
+
+
+**Handle problems**
+
+1. Seat mapping with the flight along with taking care of travel class
+2. handling the seay seat selection for the same seat by to seperate users
+3. Handling overbooking
+4. Handling the payment gatewway calls and responses effecuently
+
+****

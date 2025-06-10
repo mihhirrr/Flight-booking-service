@@ -1,117 +1,140 @@
+/**
+ * @class CustomFilter
+ * @description Builds a filter object from query parameters for flight search.
+ */
 class CustomFilter {
-    constructor(query){
-        this.query = query;
-        this.filter = {}
+    /**
+     * @constructor
+     * @param {object} query - Incoming query parameters
+     */
+    constructor(query) {
+      this.query = query;
+      this.filter = {};
     }
-
-    buildFilterObject(){
-        this.handleRoute1();
-        this.handlePassengerList();
-        this.handleTravelClass();
-        this.handleDepartureTime();
-        this.handlePriceRange();
-        // this.handleRoute2();             //Temporarily disabled
-        return this.filter
+  
+    /**
+     * Builds the complete filter object by invoking individual handlers.
+     * @returns {object} - Filter object constructed from query parameters
+     */
+    buildFilterObject() {
+      this.handleRoute1();
+      this.handlePassengerList();
+      this.handleTravelClass();
+      this.handleDepartureTime();
+      this.handlePriceRange();
+      // this.handleRoute2(); // Temporarily disabled
+      return this.filter;
     }
-
-    //mandatory options first
-    //added route1 to the custom filter
-    handleRoute1(){
-        if (!this.query.route1) return;
-        const { route1 } = this.query
-
-        const [ departureAirportCode , arrivalAirportCode ] = route1.split('-')
-        this.filter.route1 = {
+  
+    /** 
+     * Handles mandatory route1 filter.
+     */
+    handleRoute1() {
+      if (!this.query.route1) return;
+      const { route1 } = this.query;
+      const [departureAirportCode, arrivalAirportCode] = route1.split('-');
+      this.filter.route1 = {
         departureAirportCode,
-        arrivalAirportCode
-      }
+        arrivalAirportCode,
+      };
     }
-
-    //adding passenger selection to the custom filter
-    handlePassengerList(){
-        if(!this.query.passengerList) return;
-        const { passengerList } = this.query
-
-        const [ Adults , Teenagers ] = passengerList.split('-');
-        this.filter.passengerList = {
-            Adults,
-            Teenagers
-        }
+  
+    /**
+     * Parses passenger list into Adults and Teenagers.
+     */
+    handlePassengerList() {
+      if (!this.query.passengerList) return;
+      const { passengerList } = this.query;
+      const [Adults, Teenagers] = passengerList.split('-');
+      this.filter.passengerList = {
+        Adults,
+        Teenagers,
+      };
     }
-
-    //Handle Travel Class selection
-    handleTravelClass(){
-        if(!this.query.travelClass) return;
-        const { travelClass } = this.query
-        this.filter.travelClass = {};
-
-        const [Economy, Business, FirstClass] = travelClass.split('-');
-        if (Economy !== '0') this.filter.travelClass.Economy = Economy;
-        if (Business !=='0') this.filter.travelClass.Business = Business;
-        if (FirstClass !=='0') this.filter.travelClass.FirstClass = FirstClass;
+  
+    /**
+     * Parses travel class selections.
+     */
+    handleTravelClass() {
+      if (!this.query.travelClass) return;
+      const { travelClass } = this.query;
+      this.filter.travelClass = {};
+  
+      const [Economy, Business, FirstClass] = travelClass.split('-');
+      if (Economy !== '0') this.filter.travelClass.Economy = Economy;
+      if (Business !== '0') this.filter.travelClass.Business = Business;
+      if (FirstClass !== '0') this.filter.travelClass.FirstClass = FirstClass;
     }
-
-    //
-    handleDepartureTime(){
-        if(!this.query.departureTime) return;
-        const { departureTime } = this.query;
-
-        this.filter.departureTime = departureTime;
+  
+    /**
+     * Adds departure time filter.
+     */
+    handleDepartureTime() {
+      if (!this.query.departureTime) return;
+      this.filter.departureTime = this.query.departureTime;
     }
-
-
-    //Writing additional Filter options
-    //added price filter to the custom filter if opted
-    handlePriceRange(){
-        if(!this.query.priceRange) return;                          // returning if no price range provided
-
-        const { priceRange } = this.query
-
-        this.filter.priceRange = {}
-        const [ minPrice , maxPrice ] = priceRange.split('-');
-        this.filter.priceRange = {
-            minPrice,
-            maxPrice
-        }
+  
+    /**
+     * Parses price range filter into min and max prices.
+     */
+    handlePriceRange() {
+      if (!this.query.priceRange) return;
+      const { priceRange } = this.query;
+      const [minPrice, maxPrice] = priceRange.split('-');
+      this.filter.priceRange = {
+        minPrice,
+        maxPrice,
+      };
     }
-
-    //added route2 filter to the custom filter if opted
-    handleRoute2(){
-        if(!this.query.route2) return;                          // returning if additional route not provided
-
-        const { route2 } = this.query
-
-        const [ departureAirportCode , arrivalAirportCode ] = route2.split('-')
-        this.filter.route2 = {
+  
+    /**
+     * Optional: Adds secondary route filter.
+     */
+    handleRoute2() {
+      if (!this.query.route2) return;
+      const { route2 } = this.query;
+      const [departureAirportCode, arrivalAirportCode] = route2.split('-');
+      this.filter.route2 = {
         departureAirportCode,
-        arrivalAirportCode
-      }
+        arrivalAirportCode,
+      };
     }
-
-}
-
-class CustomSort {
-    constructor(query){
-        this.query = query;
-        this.sort = []
+  }
+  
+  /**
+   * @class CustomSort
+   * @description Builds a sorting array from query parameters.
+   */
+  class CustomSort {
+    /**
+     * @constructor
+     * @param {object} query - Incoming query parameters
+     */
+    constructor(query) {
+      this.query = query;
+      this.sort = [];
     }
-
-    buildSortObject(){
-        this.sortQuery()
-        
-        return [this.sort];
+  
+    /**
+     * Builds the sort array from the query.
+     * @returns {Array} - Array containing sort criteria
+     */
+    buildSortObject() {
+      this.sortQuery();
+      return [this.sort];
     }
-
-    //Creating the sort object
-    sortQuery(){
-        if(!this.query.sortBy) return;
-        const { sortBy } = this.query;
-
-        this.sort = sortBy.split('_');
+  
+    /**
+     * Parses the 'sortBy' query parameter into an array.
+     */
+    sortQuery() {
+      if (!this.query.sortBy) return;
+      const { sortBy } = this.query;
+      this.sort = sortBy.split('_');
     }
-}
-
-module.exports = {
+  }
+  
+  module.exports = {
     CustomFilter,
-    CustomSort
-}
+    CustomSort,
+  };  

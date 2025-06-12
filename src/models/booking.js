@@ -6,19 +6,8 @@ const { CONFIRMED, CANCELLED, PENDING } = Enums.BookingStatus;
 
 module.exports = (sequelize, DataTypes) => {
   class Booking extends Model {
-    /**
-     * @function associate
-     * @description Defines associations for the Booking model.
-     * This is automatically called by Sequelize in the models/index file.
-     * @param {object} models - Sequelize models
-     */
     static associate(models) {
-      // Each booking belongs to a flight
-      this.belongsTo(models.flights, {
-        foreignKey: 'id',
-        onUpdate: 'CASCADE',
-        onDelete: 'CASCADE'
-      });
+      
     }
   }
 

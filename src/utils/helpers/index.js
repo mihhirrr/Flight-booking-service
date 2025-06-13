@@ -101,10 +101,6 @@ class CustomFilter {
     }
   }
   
-  /**
-   * @class CustomSort
-   * @description Builds a sorting array from query parameters.
-   */
   class CustomSort {
     /**
      * @constructor
@@ -115,10 +111,7 @@ class CustomFilter {
       this.sort = [];
     }
   
-    /**
-     * Builds the sort array from the query.
-     * @returns {Array} - Array containing sort criteria
-     */
+
     buildSortObject() {
       this.sortQuery();
       return [this.sort];

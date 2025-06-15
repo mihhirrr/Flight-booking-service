@@ -11,8 +11,8 @@ const bookingRepository = new BookingRepository()
 
 const createBooking = async(id, selectedSeats)=>{
 
+    const t = await db.sequelize.transaction();
         try {
-            const t = await db.sequelize.transaction();
             const Flight = await axios.get(`${ServerConfig.FLIGHT_SERVICE}api/flights/${id}`)
             const airplaneId = Flight.data.data.airplaneId
             const Airplane = await axios.get(`${ServerConfig.FLIGHT_SERVICE}api/airplanes/${airplaneId}`)
@@ -26,6 +26,15 @@ const createBooking = async(id, selectedSeats)=>{
                 FirstClass > AirplaneData.FirstClassCapacity ){
                     throw new AppError('Not enough Seats', StatusCodes.BAD_REQUEST)
             }
+
+            console.log(
+                Flight.data.data.Class_Fares
+            )
+
+            const EconomyFare = parseInt(Economy) * Flight.data.data.Class_Fares[0].farePrice
+            const BusinessFare = parseInt(Economy) * Flight.data.data.Class_Fares[1].farePrice
+            const FirstClasssFare = parseInt(Economy) * Flight.data.data.Class_Fares[2].farePrice
+            console.log(EconomyFare + BusinessFare + FirstClasssFare)
 
             const Response = await axios.patch(
                 `${ServerConfig.FLIGHT_SERVICE}api/flights/${id}/seats/?travelClass=${selectedSeats}&decrement=1`  // API Call to update the Seat Count in Airplane

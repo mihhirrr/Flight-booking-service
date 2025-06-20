@@ -30,7 +30,7 @@ module.exports = {
       status: {
         type: Sequelize.ENUM,
         values: [INITIATED, BOOKED, CANCELLED, FAILED],
-        defaultValue: INITIATED
+        defaultValue: INITIATED   
       },
       totalBookedSeats: {
         type: Sequelize.INTEGER,
@@ -52,7 +52,7 @@ module.exports = {
   },
 
   async down(queryInterface, Sequelize) {
-    // await queryInterface.dropTable('Bookings');
-    await queryInterface.
+    await queryInterface.dropTable('Bookings');
+    // await queryInterface;
   }
 };

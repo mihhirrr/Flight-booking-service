@@ -15,11 +15,6 @@ class CrudFunctions {
     this.model = model;
   }
 
-  /**
-   * Creates a new record.
-   * @param {object} data - Data object to create
-   * @returns {Promise<object>} - Created record
-   */
   async create(data) {
     try {
       const response = await this.model.create(data);
@@ -30,12 +25,6 @@ class CrudFunctions {
     }
   }
 
-  /**
-   * Finds a record by primary key.
-   * @param {number|string} id - Primary key value
-   * @returns {Promise<object>} - Found record
-   * @throws {AppError} - Throws if record is not found
-   */
   async find(id) {
     try {
       const response = await this.model.findByPk(id);
@@ -51,10 +40,6 @@ class CrudFunctions {
     }
   }
 
-  /**
-   * Retrieves all records.
-   * @returns {Promise<Array<object>>} - List of all records
-   */
   async findAll() {
     try {
       const response = await this.model.findAll();
@@ -65,13 +50,7 @@ class CrudFunctions {
     }
   }
 
-  /**
-   * Updates a record by primary key.
-   * @param {number|string} id - Record identifier
-   * @param {object} data - Data to update
-   * @returns {Promise<[number]>} - Result array containing number of affected rows
-   * @throws {AppError} - Throws if record is not found
-   */
+
   async update(id, data) {
     try {
       const response = await this.model.update(data, {
@@ -92,12 +71,6 @@ class CrudFunctions {
     }
   }
 
-  /**
-   * Deletes a record by primary key.
-   * @param {number|string} id - Record identifier
-   * @returns {Promise<number>} - Number of deleted records
-   * @throws {AppError} - Throws if record is not found
-   */
   async delete(id) {
     try {
       const response = await this.model.destroy({

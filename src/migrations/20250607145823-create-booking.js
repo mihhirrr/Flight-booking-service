@@ -4,7 +4,7 @@
 
 // Importing ENUMS instead of using raw strings
 const { Enums } = require('../utils/common-utils');
-const { INITIATED, BOOKED, CANCELLED, FAILED } = Enums.BookingStatus;
+const { CONFIRMED, CANCELLED, PENDING } = Enums.BookingStatus;
 
 module.exports = {
   async up(queryInterface, Sequelize) {
@@ -29,8 +29,8 @@ module.exports = {
       },
       status: {
         type: Sequelize.ENUM,
-        values: [INITIATED, BOOKED, CANCELLED, FAILED],
-        defaultValue: INITIATED
+        values: [CONFIRMED, CANCELLED, PENDING],
+        defaultValue: PENDING
       },
       totalBookedSeats: {
         type: Sequelize.INTEGER,
@@ -52,7 +52,6 @@ module.exports = {
   },
 
   async down(queryInterface, Sequelize) {
-    // await queryInterface.dropTable('Bookings');
-    await queryInterface.
+    await queryInterface.dropTable('Bookings');
   }
 };

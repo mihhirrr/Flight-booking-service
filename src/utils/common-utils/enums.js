@@ -1,9 +1,10 @@
 const BookingStatus = {
-    INITIATED : 'Initiated',
-    BOOKED : 'Booked',
+    CONFIRMED : 'Confirmed',
     CANCELLED : 'Canceled',
-    FAILED : 'Failed'
+    PENDING : 'Pending'
 }
+
+
 
 
 module.exports = {

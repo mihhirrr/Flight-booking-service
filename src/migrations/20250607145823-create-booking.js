@@ -30,6 +30,7 @@ module.exports = {
       status: {
         type: Sequelize.ENUM,
         values: [INITIATED, BOOKED, CANCELLED, FAILED],
+        allowNull: false,
         defaultValue: INITIATED   
       },
       totalBookedSeats: {
@@ -39,6 +40,21 @@ module.exports = {
       bookingCharges: {
         type: Sequelize.INTEGER,
         allowNull: false
+      },
+      Economy: {
+        type: Sequelize.INTEGER,
+        allowNull: false,
+        defaultValue: 0
+      },
+      Business: {
+        type: Sequelize.INTEGER,
+        allowNull: false,
+        defaultValue: 0
+      },
+      FirstClass: {
+        type: Sequelize.INTEGER,
+        allowNull: false,
+        defaultValue: 0
       },
       createdAt: {
         allowNull: false,
@@ -52,7 +68,7 @@ module.exports = {
   },
 
   async down(queryInterface, Sequelize) {
-    await queryInterface.dropTable('Bookings');
-    // await queryInterface;
+
+      await queryInterface.dropTable('Bookings');
   }
 };

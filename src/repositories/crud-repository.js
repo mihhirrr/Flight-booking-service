@@ -7,10 +7,7 @@ const { StatusCodes } = require("http-status-codes");
  * Supports create, read, update, and delete operations with consistent error handling.
  */
 class CrudFunctions {
-  /**
-   * @constructor
-   * @param {import('sequelize').Model} model - Sequelize model instance
-   */
+
   constructor(model) {
     this.model = model;
   }
@@ -18,7 +15,6 @@ class CrudFunctions {
   async create(data) {
     try {
       const response = await this.model.create(data);
-      console.log(data);
       return response;
     } catch (error) {
       throw error;

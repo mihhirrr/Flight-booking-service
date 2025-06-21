@@ -9,18 +9,18 @@ const { StatusCodes } = require('http-status-codes')
 const bookingRepository = new BookingRepository()
 
 
-const createBooking = async(data)=>{
+const createBooking = async(data) => {
     // console.log(data)
 
     const t = await db.sequelize.transaction();
         try {
             const Flight = await axios.get(
-                `${ServerConfig.FLIGHT_SERVICE}api/flights/${data.flightId}`
-            )   //get flight using flight ID
+                `${ServerConfig.FLIGHT_SERVICE}api/flights/${data.flightId}`                                //get flight using flight ID
+            )   
             const airplaneId = Flight.data.data.airplaneId
             const Airplane = await axios.get(
-                `${ServerConfig.FLIGHT_SERVICE}api/airplanes/${airplaneId}`
-            )  //get airplane using AirplaneID
+                `${ServerConfig.FLIGHT_SERVICE}api/airplanes/${airplaneId}`                                //get airplane using AirplaneID
+            )  
             
             const [Economy, Business, FirstClass] = data.selectedSeats.split('-').map(s => parseInt(s))    //Split the seatselection 
             const AirplaneData = Airplane.data.data
@@ -46,6 +46,9 @@ const createBooking = async(data)=>{
            const bookingPayload = {...data, 
                 totalBookedSeats,
                 bookingCharges,
+                Economy, 
+                Business, 
+                FirstClass
                }
 
 
@@ -59,6 +62,38 @@ const createBooking = async(data)=>{
     }
 }
 
+const makePayment = async (bookingId) => {
+
+    const t = await db.sequelize.transaction();
+    
+    try {
+        const booking = await bookingRepository.find(bookingId)
+
+        const currentDate = new Date()
+        const bookingDate = new Date(booking.createdAt)
+
+        if(currentDate.getTime() - bookingDate.getTime() >= 600000){        // Expiring the booking if payment not made withing 10 minutes
+            await bookingRepository.delete(bookingId, t)                      // Deleting entry from bookings table
+
+            const selectedSeats = `${booking.Economy}-${booking.Business}-${booking.FirstClass}`
+            await axios.patch(
+                `${ServerConfig.FLIGHT_SERVICE}api/flights/${booking.flightId}/seats/?decrement=0`,          // API Call to revert the Seat capacity in Airplane
+                { travelClass: selectedSeats }
+            )
+
+            throw new AppError('Booking Expired!', StatusCodes.NOT_FOUND)
+        }
+
+        await t.commit();
+        return true;
+    } catch (error) {
+        if(error.message === `Resource not found for the ID ${bookingId}`) error.message = 'Booking Id not found!'
+        await t.rollback();
+        throw error
+    }
+}
+
 module.exports = {
-    createBooking
+    createBooking,
+    makePayment
 }

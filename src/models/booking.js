@@ -28,6 +28,7 @@ module.exports = (sequelize, DataTypes) => {
       status: {
         type: DataTypes.ENUM,
         values: [INITIATED, BOOKED, CANCELLED, FAILED],
+        allowNull: false,
         defaultValue: INITIATED
       },
       totalBookedSeats: {
@@ -37,6 +38,21 @@ module.exports = (sequelize, DataTypes) => {
       bookingCharges: {
         type: DataTypes.INTEGER,
         allowNull: false
+      },
+      Economy: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 0
+      },
+      Business: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 0
+      },
+      FirstClass: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 0
       }
     },
     {

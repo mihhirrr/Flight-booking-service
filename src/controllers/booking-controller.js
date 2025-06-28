@@ -1,9 +1,9 @@
 const { BookingService } = require('../services')
 const { Success, Error } = require('../utils/common-utils');
+const { message } = require('../utils/common-utils/success');
 
 async function createBooking(req, res, next){
 
-      console.log('Inside create controller')
       const data = { 
             userId: req.body.userId, 
             flightId: req.params.flightId, 
@@ -31,10 +31,11 @@ async function createBooking(req, res, next){
 
 async function makePayment(req, res, next){
 
-      const bookingID = req.body.bookingID;
+      const bookingID = parseInt(req.body.bookingID);
+      const seats = req.body.seats
 
       try {
-            const response = await BookingService.makePayment(parseInt(bookingID));
+            const response = await BookingService.makePayment(bookingID, seats);
             const SuccessResponse = { 
                   ...Success ,
                   data: response
@@ -53,7 +54,30 @@ async function makePayment(req, res, next){
 
 }
 
+async function cancelBooking(req, res, next) {
+      const bookingId = parseInt(req.params.bookingId);
+
+      try {
+            const response = await BookingService.cancelBooking(bookingId);
+            const SuccessResponse = { 
+                  ...Success ,
+                  data: response
+            }
+            return res.status(200).json(SuccessResponse)
+      } catch (error) {
+            console.log(error)
+            const ErrorResponse = { 
+                  ...Error ,
+                  error: { 
+                  message: error.message , 
+                  StatusCode: error.StatusCode }
+            }
+            return res.status(500).json(ErrorResponse);
+      }
+}
+
 module.exports = {
       createBooking,
-      makePayment
+      makePayment,
+      cancelBooking
 }

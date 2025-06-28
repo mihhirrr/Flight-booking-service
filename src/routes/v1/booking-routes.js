@@ -11,4 +11,7 @@ Router.route('/:flightId')
             .post(BookingMiddleware.validateBookingCreation,
                   BookingController.createBooking)
 
+Router.route('/:bookingId/cancel')
+            .patch(BookingController.cancelBooking)
+
 module.exports = Router

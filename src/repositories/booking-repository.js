@@ -1,5 +1,7 @@
 const { Booking } = require('../models');
 const CrudFunctions = require('./crud-repository');
+const AppError = require('../utils/Error-handler/AppError')
+const StatusCodes = require('http-status-codes')
 
 class BookingRepository extends CrudFunctions {
 
@@ -16,8 +18,27 @@ class BookingRepository extends CrudFunctions {
     }
   }
 
+  async update(id, data, transaction) {
+    try {
+      const response = await this.model.update(data, {
+        where: { id }
+      }, { Transaction: transaction } );
+
+      if (!response[0]) {
+        throw new AppError(
+          `Resource not found for the ID ${id}`,
+          StatusCodes.NOT_FOUND
+        );
+      }
+
+      return response;
+    } catch (error) {
+      console.log(`Error updating data in ${this.model.name}`);
+      throw error;
+    }
+  }
+
   async delete(id, transaction) {
-    console.log(id)
     try {
       const response = await this.model.destroy({
         where: { id }

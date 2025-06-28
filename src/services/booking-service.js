@@ -8,16 +8,18 @@ const { StatusCodes } = require('http-status-codes')
 
 const bookingRepository = new BookingRepository()
 
+const { Enums } = require('../utils/common-utils')
+const { BOOKED, FAILED, CANCELLED } = Enums.BookingStatus;
 
 const createBooking = async(data) => {
-    // console.log(data)
 
     const t = await db.sequelize.transaction();
         try {
             const Flight = await axios.get(
-                `${ServerConfig.FLIGHT_SERVICE}api/flights/${data.flightId}`                                //get flight using flight ID
+                `${ServerConfig.FLIGHT_SERVICE}api/flights/${data.flightId}`                                //get flight using flight ID that including fare per class
             )   
-            const airplaneId = Flight.data.data.airplaneId
+            const FlightData = Flight.data.data;
+            const airplaneId = FlightData.airplaneId
             const Airplane = await axios.get(
                 `${ServerConfig.FLIGHT_SERVICE}api/airplanes/${airplaneId}`                                //get airplane using AirplaneID
             )  
@@ -31,9 +33,10 @@ const createBooking = async(data) => {
                     throw new AppError('Not enough Seats', StatusCodes.BAD_REQUEST)                         //reject the request if seat selection is higher
             }
 
-            const EconomyFare = parseInt(Economy) * Flight.data.data.Class_Fares[0].farePrice
-            const BusinessFare = parseInt(Business) * Flight.data.data.Class_Fares[1].farePrice
-            const FirstClasssFare = parseInt(FirstClass) * Flight.data.data.Class_Fares[2].farePrice        // ^ Calculating the seat fare as per selection ^ 
+
+            const EconomyFare = parseInt(Economy) * FlightData.Class_Fares[0].farePrice
+            const BusinessFare = parseInt(Business) * FlightData.Class_Fares[1].farePrice
+            const FirstClasssFare = parseInt(FirstClass) * FlightData.Class_Fares[2].farePrice        // ^ Calculating the seat fare as per selection ^ 
 
             const bookingCharges = EconomyFare + BusinessFare + FirstClasssFare;
             const totalBookedSeats = Economy + Business+ FirstClass;
@@ -43,14 +46,14 @@ const createBooking = async(data) => {
                 { travelClass: data.selectedSeats }   
             )                                                                                                  
 
-           const bookingPayload = {...data, 
+           const bookingPayload = {
+                ...data, 
                 totalBookedSeats,
                 bookingCharges,
                 Economy, 
                 Business, 
                 FirstClass
                }
-
 
             const response = await bookingRepository.create( bookingPayload , t )                            // Creating booking by calling overwrtiten create()
 
@@ -62,18 +65,18 @@ const createBooking = async(data) => {
     }
 }
 
-const makePayment = async (bookingId) => {
+const makePayment = async (bookingId, seats) => {
 
     const t = await db.sequelize.transaction();
     
     try {
         const booking = await bookingRepository.find(bookingId)
 
-        const currentDate = new Date()
+        const currentDate=  new Date()
         const bookingDate = new Date(booking.createdAt)
 
         if(currentDate.getTime() - bookingDate.getTime() >= 600000){        // Expiring the booking if payment not made withing 10 minutes
-            await bookingRepository.delete(bookingId, t)                      // Deleting entry from bookings table
+            await bookingRepository.update(bookingId, { status: FAILED } , t );            // Setting the booking status to 'FAILED' to cleanup using cron
 
             const selectedSeats = `${booking.Economy}-${booking.Business}-${booking.FirstClass}`
             await axios.patch(
@@ -81,13 +84,39 @@ const makePayment = async (bookingId) => {
                 { travelClass: selectedSeats }
             )
 
-            throw new AppError('Booking Expired!', StatusCodes.NOT_FOUND)
+            throw new AppError('Booking Expired! Please create a new itenery.', StatusCodes.GONE)
         }
+
+        // Some payment GW logic
+
+        await bookingRepository.update(bookingId, { status: BOOKED } , t );
+        await axios.patch(                                                          // API call to udpate the Seat Status and set booking ID in Seats model
+            `${ServerConfig.FLIGHT_SERVICE}api/seats`,
+            {
+                seats,
+                BookingId: bookingId,
+                status: BOOKED,
+            }
+        )
 
         await t.commit();
         return true;
     } catch (error) {
-        if(error.message === `Resource not found for the ID ${bookingId}`) error.message = 'Booking Id not found!'
+        if(error.message === `Resource not found for the ID ${bookingId}`) error.message = 'Booking not found!'
+        await t.rollback();
+        throw error
+    }
+}
+
+const cancelBooking = async (bookingId) =>{
+    const t = await db.sequelize.transaction();
+
+    try {
+        await bookingRepository.update(bookingId, { status: CANCELLED } , t );
+        await t.commit();
+        return "Booking cancelled successfully"
+    } catch (error) {
+        if(error.message === `Resource not found for the ID ${bookingId}`) error.message = 'Booking not found!'
         await t.rollback();
         throw error
     }
@@ -95,5 +124,6 @@ const makePayment = async (bookingId) => {
 
 module.exports = {
     createBooking,
-    makePayment
+    makePayment,
+    cancelBooking
 }

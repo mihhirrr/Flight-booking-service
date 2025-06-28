@@ -21,8 +21,9 @@ class BookingRepository extends CrudFunctions {
   async update(id, data, transaction) {
     try {
       const response = await this.model.update(data, {
-        where: { id }
-      }, { Transaction: transaction } );
+        where: { id },
+        transaction
+      });
 
       if (!response[0]) {
         throw new AppError(

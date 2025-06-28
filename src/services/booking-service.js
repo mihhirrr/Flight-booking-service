@@ -76,13 +76,14 @@ const makePayment = async (bookingId, seats) => {
         const bookingDate = new Date(booking.createdAt)
 
         if(currentDate.getTime() - bookingDate.getTime() >= 600000){        // Expiring the booking if payment not made withing 10 minutes
-            await bookingRepository.update(bookingId, { status: FAILED } , t );            // Setting the booking status to 'FAILED' to cleanup using cron
-
-            const selectedSeats = `${booking.Economy}-${booking.Business}-${booking.FirstClass}`
-            await axios.patch(
-                `${ServerConfig.FLIGHT_SERVICE}api/flights/${booking.flightId}/seats/?decrement=0`,          // API Call to revert the Seat capacity in Airplane
-                { travelClass: selectedSeats }
-            )
+            // await bookingRepository.update(bookingId, { status: FAILED } , t );            // Setting the booking status to 'FAILED' to cleanup using cron 
+            const expired = true
+            cancelBooking(bookingId, expired)
+            // const selectedSeats = `${booking.Economy}-${booking.Business}-${booking.FirstClass}`
+            // await axios.patch(
+            //     `${ServerConfig.FLIGHT_SERVICE}api/flights/${booking.flightId}/seats/?decrement=0`,          // API Call to revert the Seat capacity in Airplane
+            //     { travelClass: selectedSeats }
+            // )
 
             throw new AppError('Booking Expired! Please create a new itenery.', StatusCodes.GONE)
         }
@@ -108,11 +109,25 @@ const makePayment = async (bookingId, seats) => {
     }
 }
 
-const cancelBooking = async (bookingId) =>{
+const cancelBooking = async (bookingId, expired = false) =>{
     const t = await db.sequelize.transaction();
 
     try {
-        await bookingRepository.update(bookingId, { status: CANCELLED } , t );
+        const booking = await bookingRepository.find(bookingId)
+
+        if(booking.status === 'Failed'){
+            throw new AppError('Booking already Expired!', StatusCodes.GONE)
+        }
+
+        if(expired) await bookingRepository.update(bookingId, { status: FAILED } , t );
+        else await bookingRepository.update(bookingId, { status: CANCELLED } , t );
+
+        const selectedSeats = `${booking.Economy}-${booking.Business}-${booking.FirstClass}`
+        await axios.patch(
+            `${ServerConfig.FLIGHT_SERVICE}api/flights/${booking.flightId}/seats/?decrement=0`,          // API Call to revert the Seat capacity in Airplane
+            { travelClass: selectedSeats }
+        )
+
         await t.commit();
         return "Booking cancelled successfully"
     } catch (error) {

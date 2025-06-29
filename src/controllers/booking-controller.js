@@ -42,7 +42,6 @@ async function makePayment(req, res, next){
             }
             return res.status(200).json(SuccessResponse)
       } catch (error) {
-            console.log(error)
             const ErrorResponse = { 
                   ...Error ,
                   error: { 

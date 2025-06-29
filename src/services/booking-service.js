@@ -72,23 +72,38 @@ const makePayment = async (bookingId, seats) => {
     try {
         const booking = await bookingRepository.find(bookingId)
 
+        if(booking.status === CANCELLED || booking.status === FAILED ) {
+            throw new AppError('Booking already canceled! Please create a new itenery.', StatusCodes.GONE)
+        }
+        if(booking.status === BOOKED) throw new AppError('Booking already confirmed!', StatusCodes.BAD_REQUEST)
+
         const currentDate=  new Date()
         const bookingDate = new Date(booking.createdAt)
 
-        if(currentDate.getTime() - bookingDate.getTime() >= 600000){        // Expiring the booking if payment not made withing 10 minutes
-            // await bookingRepository.update(bookingId, { status: FAILED } , t );            // Setting the booking status to 'FAILED' to cleanup using cron 
+        if(currentDate.getTime() - bookingDate.getTime() >= 600000){                        // Expiring the booking if payment not made withing 10 minutes
             const expired = true
-            cancelBooking(bookingId, expired)
-            // const selectedSeats = `${booking.Economy}-${booking.Business}-${booking.FirstClass}`
-            // await axios.patch(
-            //     `${ServerConfig.FLIGHT_SERVICE}api/flights/${booking.flightId}/seats/?decrement=0`,          // API Call to revert the Seat capacity in Airplane
-            //     { travelClass: selectedSeats }
-            // )
+            await cancelBooking(bookingId, expired)
 
-            throw new AppError('Booking Expired! Please create a new itenery.', StatusCodes.GONE)
+            throw new AppError('Booking Expired! Please create a new itenery.', 
+                StatusCodes.GONE)
         }
 
-        // Some payment GW logic
+
+        /* Some payment GW logic
+        const PaymentResponse = await mimicingPaymentGatewayFunction()
+        */
+
+        /* Below will be wrapped in if.. block so that it should only be triggered if above payment logic is success,
+         else throw error and do not update the booking and seat status 
+
+         e.g. if(!PaymentResponse?.success){
+            t.rollback();
+            throw new AppError('Payment Failed!', StatusCodes.BAD_REQUEST)
+         }else{
+            // Beloww code
+         }
+         
+         */
 
         await bookingRepository.update(bookingId, { status: BOOKED } , t );
         await axios.patch(                                                          // API call to udpate the Seat Status and set booking ID in Seats model
@@ -115,21 +130,28 @@ const cancelBooking = async (bookingId, expired = false) =>{
     try {
         const booking = await bookingRepository.find(bookingId)
 
-        if(booking.status === 'Failed'){
+        if(booking.status === 'Failed'){                                                        //Maybe I don't need this
             throw new AppError('Booking already Expired!', StatusCodes.GONE)
         }
 
-        if(expired) await bookingRepository.update(bookingId, { status: FAILED } , t );
-        else await bookingRepository.update(bookingId, { status: CANCELLED } , t );
+        const status = expired? FAILED : CANCELLED;
+        await bookingRepository.update(bookingId, { status } , t );
 
         const selectedSeats = `${booking.Economy}-${booking.Business}-${booking.FirstClass}`
-        await axios.patch(
+        const response = await axios.patch(
             `${ServerConfig.FLIGHT_SERVICE}api/flights/${booking.flightId}/seats/?decrement=0`,          // API Call to revert the Seat capacity in Airplane
             { travelClass: selectedSeats }
         )
 
-        await t.commit();
-        return "Booking cancelled successfully"
+       if(!response?.data?.success){
+            await t.rollback();
+            throw new AppError('Seat update failed. Booking not cancelled.', 
+                StatusCodes.INTERNAL_SERVER_ERROR)
+       }
+
+       await t.commit();
+       return "Booking cancelled successfully!";
+
     } catch (error) {
         if(error.message === `Resource not found for the ID ${bookingId}`) error.message = 'Booking not found!'
         await t.rollback();

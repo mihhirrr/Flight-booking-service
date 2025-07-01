@@ -36,9 +36,9 @@ class CrudFunctions {
     }
   }
 
-  async findAll() {
+  async findAll(options = {}) {
     try {
-      const response = await this.model.findAll();
+      const response = await this.model.findAll(options);
       return response;
     } catch (error) {
       console.log(`Error retrieving data from ${this.model.name}`);

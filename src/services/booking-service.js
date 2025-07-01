@@ -9,7 +9,8 @@ const { StatusCodes } = require('http-status-codes')
 const bookingRepository = new BookingRepository()
 
 const { Enums } = require('../utils/common-utils')
-const { BOOKED, FAILED, CANCELLED } = Enums.BookingStatus;
+const { Op } = require('sequelize')
+const { BOOKED, EXPIRED, CANCELLED } = Enums.BookingStatus;
 
 const createBooking = async(data) => {
 
@@ -72,8 +73,9 @@ const makePayment = async (bookingId, seats) => {
     try {
         const booking = await bookingRepository.find(bookingId)
 
-        if(booking.status === CANCELLED || booking.status === FAILED ) {
-            throw new AppError('Booking already canceled! Please create a new itenery.', StatusCodes.GONE)
+        if(booking.status === CANCELLED || booking.status === EXPIRED ) {
+            throw new AppError('Booking already canceled or Booking is expired! Please create a new itenery.', 
+                StatusCodes.GONE)
         }
         if(booking.status === BOOKED) throw new AppError('Booking already confirmed!', StatusCodes.BAD_REQUEST)
 
@@ -106,7 +108,7 @@ const makePayment = async (bookingId, seats) => {
          */
 
         await bookingRepository.update(bookingId, { status: BOOKED } , t );
-        await axios.patch(                                                          // API call to udpate the Seat Status and set booking ID in Seats model
+        const updateSeatsResponse = await axios.patch(                                                          // API call to udpate the Seat Status and set booking ID in Seats model
             `${ServerConfig.FLIGHT_SERVICE}api/seats`,
             {
                 seats,
@@ -115,10 +117,19 @@ const makePayment = async (bookingId, seats) => {
             }
         )
 
+        if(!updateSeatsResponse?.data.success){
+            await t.rollback();
+            // Maybe, Call refund check function
+            throw new AppError('Seat update failed. Booking not confirmed!',
+                StatusCodes.INTERNAL_SERVER_ERROR)
+        }
+
         await t.commit();
         return true;
     } catch (error) {
-        if(error.message === `Resource not found for the ID ${bookingId}`) error.message = 'Booking not found!'
+        if (error.message === `Resource not found for the ID ${bookingId}`) {
+            error.message = 'Booking not found!'
+        }
         await t.rollback();
         throw error
     }
@@ -130,11 +141,18 @@ const cancelBooking = async (bookingId, expired = false) =>{
     try {
         const booking = await bookingRepository.find(bookingId)
 
-        if(booking.status === 'Failed'){                                                        //Maybe I don't need this
+        if(booking.status === EXPIRED){                                                        //Maybe I don't need this
             throw new AppError('Booking already Expired!', StatusCodes.GONE)
         }
 
-        const status = expired? FAILED : CANCELLED;
+        const status = expired? EXPIRED : CANCELLED;
+
+        /* if(!expired) {
+             const refundRespponse = RefundFarePaymentMimicFunction()
+             and allow below code if refundRespponse = true
+        }
+        */
+
         await bookingRepository.update(bookingId, { status } , t );
 
         const selectedSeats = `${booking.Economy}-${booking.Business}-${booking.FirstClass}`
@@ -159,8 +177,37 @@ const cancelBooking = async (bookingId, expired = false) =>{
     }
 }
 
+// to Expire the bookings that are unprocessed if not paid within 10 minutes
+const expireUnprocessedBookings = async() => {
+    const t = await db.sequelize.transaction();
+    try {
+        const expirationTime = new Date(Date.now() - 10 * 60 * 1000)
+        const unprocessedBookingsCount = await bookingRepository.cancelOldBookings({
+            status: EXPIRED
+        },
+            {
+            where:{
+                status:{
+                    [ Op.notIn ] : [ BOOKED, CANCELLED, EXPIRED ]
+                },
+                createdAt:{
+                    [ Op.lte ] : expirationTime
+                },
+            },
+            transaction: t
+        }
+    )   
+        await t.commit()
+        return unprocessedBookingsCount;
+    } catch (error) {
+        await t.rollback();
+        throw error
+    }
+}
+
 module.exports = {
     createBooking,
     makePayment,
-    cancelBooking
+    cancelBooking,
+    expireUnprocessedBookings
 }

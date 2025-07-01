@@ -52,6 +52,15 @@ class BookingRepository extends CrudFunctions {
       throw error;
     }
   }
+
+  async cancelOldBookings(data, condition){
+    try {
+      const response = await Booking.update( data, condition )
+      return response
+    } catch (error) {
+      throw error
+    }
+  }
 }
 
 module.exports = BookingRepository;

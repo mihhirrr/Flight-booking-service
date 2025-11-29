@@ -137,9 +137,10 @@ const makePayment = async (bookingId, seats) => {
 
 const cancelBooking = async (bookingId, expired = false) =>{
     const t = await db.sequelize.transaction();
+    let booking;
 
     try {
-        const booking = await bookingRepository.find(bookingId)
+        booking = await bookingRepository.find(bookingId)
 
         if(booking.status === EXPIRED){                                                        //Maybe I don't need this
             throw new AppError('Booking already Expired!', StatusCodes.GONE)
@@ -154,27 +155,38 @@ const cancelBooking = async (bookingId, expired = false) =>{
         */
 
         await bookingRepository.update(bookingId, { status } , t );
+        await t.commit();
 
-        const selectedSeats = `${booking.Economy}-${booking.Business}-${booking.FirstClass}`
-        const response = await axios.patch(
-            `${ServerConfig.FLIGHT_SERVICE}api/flights/${booking.flightId}/seats/?decrement=0`,          // API Call to revert the Seat capacity in Airplane
-            { travelClass: selectedSeats }
-        )
-
-       if(!response?.data?.success){
-            await t.rollback();
-            throw new AppError('Seat update failed. Booking not cancelled.', 
-                StatusCodes.INTERNAL_SERVER_ERROR)
-       }
-
-       await t.commit();
-       return "Booking cancelled successfully!";
-
-    } catch (error) {
+        } catch (error) {
         if(error.message === `Resource not found for the ID ${bookingId}`) error.message = 'Booking not found!'
         await t.rollback();
         throw error
     }
+
+    // API Call to revert the Seat capacity in Airplane after cancellation
+        try {
+            const selectedSeats = `${booking.Economy}-${booking.Business}-${booking.FirstClass}`
+            const endpoint = new URL(
+            `/api/flights/${booking.flightId}/seats/`,
+            ServerConfig.FLIGHT_SERVICE
+            );
+          
+            endpoint.searchParams.set('decrement', '0');
+            const payload = {
+            travelClass: selectedSeats
+            };
+          
+            const response = await axios.patch(endpoint.toString(), payload);
+          
+        // Processing the cancellation response ^^
+            if(!response?.data?.success){
+            throw new AppError('Seats not reverted', StatusCodes.FAILED_DEPENDENCY)
+       }
+        } catch (error) {
+            console.log(error)
+        }
+        
+       return "Booking cancelled successfully!";
 }
 
 // to Expire the bookings that are unprocessed if not paid within 10 minutes

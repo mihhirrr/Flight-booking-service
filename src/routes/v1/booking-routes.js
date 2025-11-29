@@ -3,6 +3,8 @@ const Router = express.Router();
 const { BookingController } = require('../../controllers')
 const { BookingMiddleware } = require('../../middlewares')
 
+
+Router.route('/health').get(BookingController.getBookingRoute)
 Router.route('/payments')
             .post(BookingMiddleware.PaymentMiddleware,
                   BookingController.makePayment)

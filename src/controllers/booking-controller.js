@@ -2,6 +2,16 @@ const { BookingService } = require('../services')
 const { Success, Error } = require('../utils/common-utils');
 const { message } = require('../utils/common-utils/success');
 
+//test route->
+
+async function getBookingRoute(req, res, next) {
+      res.json({
+            message:"Booking route is functional."
+      })
+}
+
+//test route end ^^
+
 async function createBooking(req, res, next){
 
       const data = { 
@@ -78,5 +88,6 @@ async function cancelBooking(req, res, next) {
 module.exports = {
       createBooking,
       makePayment,
-      cancelBooking
+      cancelBooking,
+      getBookingRoute
 }

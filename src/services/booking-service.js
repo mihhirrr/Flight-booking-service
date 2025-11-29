@@ -5,7 +5,7 @@ const { ServerConfig } = require('../config')
 const AppError = require('../utils/Error-handler/AppError')
 const { StatusCodes } = require('http-status-codes')
 
-
+//Creating an instance of BookingRepository
 const bookingRepository = new BookingRepository()
 
 const { Enums } = require('../utils/common-utils')

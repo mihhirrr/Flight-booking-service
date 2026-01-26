@@ -153,56 +153,45 @@ const cancelBooking = async (bookingId, userId, expired = false) =>{
 
         // Verify booking belongs to authenticated user (skip if expired is true - internal call)
         if (!expired && booking.userId !== userId) {
-            await t.rollback();
             throw new AppError('Unauthorized: This booking does not belong to you!', 
                 StatusCodes.FORBIDDEN)
         }
 
-        if(booking.status === EXPIRED){                                                        //Maybe I don't need this
+        if(booking.status === EXPIRED){
             throw new AppError('Booking already Expired!', StatusCodes.GONE)
         }
 
         const status = expired? EXPIRED : CANCELLED;
 
-        /* if(!expired) {
-             const refundRespponse = RefundFarePaymentMimicFunction()
-             and allow below code if refundRespponse = true
-        }
-        */
-
         await bookingRepository.update(bookingId, { status } , t );
+
+        // API Call to revert the Seat capacity in Airplane after cancellation (WITHIN transaction)
+        const selectedSeats = `${booking.Economy}-${booking.Business}-${booking.FirstClass}`
+        const endpoint = new URL(
+            `/api/flights/${booking.flightId}/seats/`,
+            ServerConfig.FLIGHT_SERVICE
+        );
+      
+        endpoint.searchParams.set('decrement', '0');
+        const payload = {
+            travelClass: selectedSeats
+        };
+      
+        const response = await axios.patch(endpoint.toString(), payload);
+      
+        // Validate seat revert response
+        if(!response?.data?.success){
+            throw new AppError('Seats not reverted. Cancellation failed!', StatusCodes.FAILED_DEPENDENCY)
+        }
+
         await t.commit();
+        return "Booking cancelled successfully!";
 
         } catch (error) {
         if(error.message === `Resource not found for the ID ${bookingId}`) error.message = 'Booking not found!'
         await t.rollback();
         throw error
     }
-
-    // API Call to revert the Seat capacity in Airplane after cancellation
-        try {
-            const selectedSeats = `${booking.Economy}-${booking.Business}-${booking.FirstClass}`
-            const endpoint = new URL(
-            `/api/flights/${booking.flightId}/seats/`,
-            ServerConfig.FLIGHT_SERVICE
-            );
-          
-            endpoint.searchParams.set('decrement', '0');
-            const payload = {
-            travelClass: selectedSeats
-            };
-          
-            const response = await axios.patch(endpoint.toString(), payload);
-          
-        // Processing the cancellation response ^^
-            if(!response?.data?.success){
-            throw new AppError('Seats not reverted', StatusCodes.FAILED_DEPENDENCY)
-       }
-        } catch (error) {
-            console.log(error)
-        }
-        
-       return "Booking cancelled successfully!";
 }
 
 // to Expire the bookings that are unprocessed if not paid within 10 minutes

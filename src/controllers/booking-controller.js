@@ -14,7 +14,7 @@ async function getBookingRoute(req, res, next) {
 
 async function createBooking(req, res, next){
       const data = { 
-            userId: req.user.email, 
+            userId: parseInt(req.headers['x-user-id']), 
             flightId: req.params.flightId, 
             selectedSeats: req.query.seats 
       }
@@ -42,7 +42,7 @@ async function makePayment(req, res, next){
 
       const bookingID = parseInt(req.body.bookingID);
       const seats = req.body.seats
-      const userId = req.user.email;
+      const userId = parseInt(req.headers['x-user-id']);
 
       try {
             const response = await BookingService.makePayment(bookingID, seats, userId);
@@ -65,7 +65,7 @@ async function makePayment(req, res, next){
 
 async function cancelBooking(req, res, next) {
       const bookingId = parseInt(req.params.bookingId);
-      const userId = req.user.email;
+      const userId = parseInt(req.headers['x-user-id']);
 
       try {
             const response = await BookingService.cancelBooking(bookingId, userId);

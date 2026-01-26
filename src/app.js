@@ -13,6 +13,5 @@ app.use('/api/bookings', BookingRouter);
 
 app.listen(ServerConfig.PORT, () => {
     console.log(`Successfully started the server on PORT : ${ServerConfig.PORT}`);
-    console.log('Running cron test now...')
     // CRON()
 });

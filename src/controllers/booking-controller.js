@@ -13,9 +13,8 @@ async function getBookingRoute(req, res, next) {
 //test route end ^^
 
 async function createBooking(req, res, next){
-
       const data = { 
-            userId: req.body.userId, 
+            userId: req.user.email, 
             flightId: req.params.flightId, 
             selectedSeats: req.query.seats 
       }
@@ -35,7 +34,7 @@ async function createBooking(req, res, next){
                   message: error.message , 
                   StatusCode: error.StatusCode }
             }
-            return res.status(500).json(ErrorResponse);
+            return res.status(error.StatusCode || 500).json(ErrorResponse);
       }
  }
 
@@ -43,9 +42,10 @@ async function makePayment(req, res, next){
 
       const bookingID = parseInt(req.body.bookingID);
       const seats = req.body.seats
+      const userId = req.user.email;
 
       try {
-            const response = await BookingService.makePayment(bookingID, seats);
+            const response = await BookingService.makePayment(bookingID, seats, userId);
             const SuccessResponse = { 
                   ...Success ,
                   data: response
@@ -58,16 +58,17 @@ async function makePayment(req, res, next){
                   message: error.message , 
                   StatusCode: error.StatusCode }
             }
-            return res.status(500).json(ErrorResponse);
+            return res.status(error.StatusCode || 500).json(ErrorResponse);
       }
 
 }
 
 async function cancelBooking(req, res, next) {
       const bookingId = parseInt(req.params.bookingId);
+      const userId = req.user.email;
 
       try {
-            const response = await BookingService.cancelBooking(bookingId);
+            const response = await BookingService.cancelBooking(bookingId, userId);
             const SuccessResponse = { 
                   ...Success ,
                   data: response
@@ -81,7 +82,7 @@ async function cancelBooking(req, res, next) {
                   message: error.message , 
                   StatusCode: error.StatusCode }
             }
-            return res.status(500).json(ErrorResponse);
+            return res.status(error.StatusCode || 500).json(ErrorResponse);
       }
 }
 

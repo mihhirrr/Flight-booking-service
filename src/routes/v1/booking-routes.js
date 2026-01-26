@@ -6,14 +6,17 @@ const { BookingMiddleware } = require('../../middlewares')
 
 Router.route('/health').get(BookingController.getBookingRoute)
 Router.route('/payments')
-            .post(BookingMiddleware.PaymentMiddleware,
+            .post(BookingMiddleware.authenticateUser,
+                  BookingMiddleware.PaymentMiddleware,
                   BookingController.makePayment)
 
 Router.route('/:flightId')
-            .post(BookingMiddleware.validateBookingCreation,
+            .post(BookingMiddleware.authenticateUser,
+                  BookingMiddleware.validateBookingCreation,
                   BookingController.createBooking)
 
 Router.route('/:bookingId/cancel')
-            .patch(BookingController.cancelBooking)
+            .patch(BookingMiddleware.authenticateUser,
+                  BookingController.cancelBooking)
 
 module.exports = Router

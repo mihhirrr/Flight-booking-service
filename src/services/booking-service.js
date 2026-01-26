@@ -13,12 +13,12 @@ const { Op } = require('sequelize')
 const { BOOKED, EXPIRED, CANCELLED } = Enums.BookingStatus;
 
 const createBooking = async(data) => {
-
     const t = await db.sequelize.transaction();
         try {
             const Flight = await axios.get(
                 `${ServerConfig.FLIGHT_SERVICE}api/flights/${data.flightId}`                                //get flight using flight ID that including fare per class
             )   
+
             const FlightData = Flight.data.data;
             const airplaneId = FlightData.airplaneId
             const Airplane = await axios.get(
@@ -61,17 +61,25 @@ const createBooking = async(data) => {
             await t.commit();
             return response
         } catch (error) {  
+            console.log(error.message)
             await t.rollback()
             throw error
     }
 }
 
-const makePayment = async (bookingId, seats) => {
+const makePayment = async (bookingId, seats, userId) => {
 
     const t = await db.sequelize.transaction();
     
     try {
         const booking = await bookingRepository.find(bookingId)
+
+        // Verify booking belongs to authenticated user
+        if (booking.userId !== userId) {
+            await t.rollback();
+            throw new AppError('Unauthorized: This booking does not belong to you!', 
+                StatusCodes.FORBIDDEN)
+        }
 
         if(booking.status === CANCELLED || booking.status === EXPIRED ) {
             throw new AppError('Booking already canceled or Booking is expired! Please create a new itenery.', 
@@ -84,7 +92,7 @@ const makePayment = async (bookingId, seats) => {
 
         if(currentDate.getTime() - bookingDate.getTime() >= 600000){                        // Expiring the booking if payment not made withing 10 minutes
             const expired = true
-            await cancelBooking(bookingId, expired)
+            await cancelBooking(bookingId, userId, expired)
 
             throw new AppError('Booking Expired! Please create a new itenery.', 
                 StatusCodes.GONE)
@@ -112,11 +120,11 @@ const makePayment = async (bookingId, seats) => {
             `${ServerConfig.FLIGHT_SERVICE}api/seats`,
             {
                 seats,
-                BookingId: bookingId,
+                BookingId: bookingId, 
                 status: BOOKED,
             }
         )
-
+        console.log(updateSeatsResponse)
         if(!updateSeatsResponse?.data.success){
             await t.rollback();
             // Maybe, Call refund check function
@@ -127,6 +135,7 @@ const makePayment = async (bookingId, seats) => {
         await t.commit();
         return true;
     } catch (error) {
+        console.log(error.message)
         if (error.message === `Resource not found for the ID ${bookingId}`) {
             error.message = 'Booking not found!'
         }
@@ -135,12 +144,19 @@ const makePayment = async (bookingId, seats) => {
     }
 }
 
-const cancelBooking = async (bookingId, expired = false) =>{
+const cancelBooking = async (bookingId, userId, expired = false) =>{
     const t = await db.sequelize.transaction();
     let booking;
 
     try {
         booking = await bookingRepository.find(bookingId)
+
+        // Verify booking belongs to authenticated user (skip if expired is true - internal call)
+        if (!expired && booking.userId !== userId) {
+            await t.rollback();
+            throw new AppError('Unauthorized: This booking does not belong to you!', 
+                StatusCodes.FORBIDDEN)
+        }
 
         if(booking.status === EXPIRED){                                                        //Maybe I don't need this
             throw new AppError('Booking already Expired!', StatusCodes.GONE)

@@ -1,3 +1,4 @@
 module.exports = {
-      BookingMiddleware: require('./booking-middleware')
+      BookingMiddleware: require('./booking-middleware'),
+      AuthMiddleware: require('./auth-middleware')
 }

@@ -14,7 +14,9 @@ Router.route('/:flightId')
             .post(AuthMiddleware.isAuthenticated,
                   BookingMiddleware.validateBookingCreation,
                   BookingController.createBooking)
-
+Router.route('/:bookingId')
+            .get(AuthMiddleware.isAuthenticated,
+                  BookingController.getBookingById)
 Router.route('/:bookingId/cancel')
             .patch(AuthMiddleware.isAuthenticated,
                   BookingController.cancelBooking)

@@ -4,13 +4,28 @@ const db = require('../models')
 const { ServerConfig } = require('../config')
 const AppError = require('../utils/Error-handler/AppError')
 const { StatusCodes } = require('http-status-codes')
+const { Enums } = require('../utils/common-utils')
+const { ADMIN, STAFF } = Enums.User_Profile;
+const { BOOKED, EXPIRED, CANCELLED } = Enums.BookingStatus;
+const { Op } = require('sequelize')
 
 //Creating an instance of BookingRepository
 const bookingRepository = new BookingRepository()
 
-const { Enums } = require('../utils/common-utils')
-const { Op } = require('sequelize')
-const { BOOKED, EXPIRED, CANCELLED } = Enums.BookingStatus;
+const getBookingById = async(bookingId, userId, role) => {
+    try {
+        const booking = await bookingRepository.find(bookingId);
+        if(!booking){
+            throw new AppError('Booking not found!', StatusCodes.NOT_FOUND);
+        }
+        if(booking.userId !== userId && role !== ADMIN && role !== STAFF) {
+            throw new AppError('Unauthorized: You are not authorized to access this booking!', StatusCodes.FORBIDDEN);
+        }
+        return booking;
+    } catch (error) {
+        throw error;
+    }
+}
 
 const createBooking = async(data) => {
     const t = await db.sequelize.transaction();
@@ -223,6 +238,7 @@ const expireUnprocessedBookings = async() => {
 }
 
 module.exports = {
+    getBookingById,
     createBooking,
     makePayment,
     cancelBooking,

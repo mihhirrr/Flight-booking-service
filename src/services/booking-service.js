@@ -4,21 +4,79 @@ const db = require('../models')
 const { ServerConfig } = require('../config')
 const AppError = require('../utils/Error-handler/AppError')
 const { StatusCodes } = require('http-status-codes')
+const { Enums } = require('../utils/common-utils')
+const { ADMIN, STAFF } = Enums.User_Profile;
+const { BOOKED, EXPIRED, CANCELLED } = Enums.BookingStatus;
+const { Op } = require('sequelize')
 
 //Creating an instance of BookingRepository
 const bookingRepository = new BookingRepository()
 
-const { Enums } = require('../utils/common-utils')
-const { Op } = require('sequelize')
-const { BOOKED, EXPIRED, CANCELLED } = Enums.BookingStatus;
+const getBookingById = async(bookingId, userId, role) => {
+    try {
+        const booking = await bookingRepository.find(bookingId);
+        if(!booking){
+            throw new AppError('Booking not found!', StatusCodes.NOT_FOUND);
+        }
+        if(booking.userId !== userId && role !== ADMIN && role !== STAFF) {
+            throw new AppError('Unauthorized: You are not authorized to access this booking!', StatusCodes.FORBIDDEN);
+        }
+
+        let flightDetails = null;
+        try {
+            const flightResponse = await axios.get(
+                `${ServerConfig.FLIGHT_SERVICE}api/flights/${booking.flightId}`
+            );
+            flightDetails = flightResponse.data.data;
+        } catch (flightError) {
+            console.warn(`Could not fetch flight details: `, flightError.message);
+        }
+
+        return {
+            ...booking.toJSON(),
+            flightDetails: flightDetails
+        };
+
+    } catch (error) {
+        throw error;
+    }
+}
+
+const getAllBookingsForUser = async(userId) => {
+    try {
+        const bookings = await bookingRepository.findAll({
+            where: { userId }
+        });
+        return bookings;
+    } catch (error) {
+        throw error;
+    }
+}
+
+const getAllBookings = async(bookingStateFilter = undefined) => {
+    try {
+        let queryOptions = {}
+        if(bookingStateFilter){
+            queryOptions = {
+                status : bookingStateFilter
+            }
+        }
+        const bookings = await bookingRepository.findAll({
+            where: queryOptions
+        });
+        return bookings;
+    } catch (error) {
+        throw error;
+    }
+}
 
 const createBooking = async(data) => {
-
     const t = await db.sequelize.transaction();
         try {
             const Flight = await axios.get(
                 `${ServerConfig.FLIGHT_SERVICE}api/flights/${data.flightId}`                                //get flight using flight ID that including fare per class
             )   
+
             const FlightData = Flight.data.data;
             const airplaneId = FlightData.airplaneId
             const Airplane = await axios.get(
@@ -61,17 +119,25 @@ const createBooking = async(data) => {
             await t.commit();
             return response
         } catch (error) {  
+            console.log(error.message)
             await t.rollback()
             throw error
     }
 }
 
-const makePayment = async (bookingId, seats) => {
+const makePayment = async (bookingId, seats, userId) => {
 
     const t = await db.sequelize.transaction();
     
     try {
         const booking = await bookingRepository.find(bookingId)
+
+        // Verify booking belongs to authenticated user
+        if (booking.userId !== userId) {
+            await t.rollback();
+            throw new AppError('Unauthorized: This booking does not belong to you!', 
+                StatusCodes.FORBIDDEN)
+        }
 
         if(booking.status === CANCELLED || booking.status === EXPIRED ) {
             throw new AppError('Booking already canceled or Booking is expired! Please create a new itenery.', 
@@ -84,7 +150,7 @@ const makePayment = async (bookingId, seats) => {
 
         if(currentDate.getTime() - bookingDate.getTime() >= 600000){                        // Expiring the booking if payment not made withing 10 minutes
             const expired = true
-            await cancelBooking(bookingId, expired)
+            await cancelBooking(bookingId, userId, expired)
 
             throw new AppError('Booking Expired! Please create a new itenery.', 
                 StatusCodes.GONE)
@@ -112,11 +178,11 @@ const makePayment = async (bookingId, seats) => {
             `${ServerConfig.FLIGHT_SERVICE}api/seats`,
             {
                 seats,
-                BookingId: bookingId,
+                BookingId: bookingId, 
                 status: BOOKED,
             }
         )
-
+        console.log(updateSeatsResponse)
         if(!updateSeatsResponse?.data.success){
             await t.rollback();
             // Maybe, Call refund check function
@@ -127,6 +193,7 @@ const makePayment = async (bookingId, seats) => {
         await t.commit();
         return true;
     } catch (error) {
+        console.log(error.message)
         if (error.message === `Resource not found for the ID ${bookingId}`) {
             error.message = 'Booking not found!'
         }
@@ -135,58 +202,53 @@ const makePayment = async (bookingId, seats) => {
     }
 }
 
-const cancelBooking = async (bookingId, expired = false) =>{
+const cancelBooking = async (bookingId, userId, role, expired = false) =>{
     const t = await db.sequelize.transaction();
     let booking;
 
     try {
         booking = await bookingRepository.find(bookingId)
+        // Verify booking belongs to authenticated user or is an admin or staff
+        if (!expired && booking.userId !== userId && role !== ADMIN && role !== STAFF) {
+            throw new AppError('Unauthorized: You are not authorized to cancel this booking!', 
+                StatusCodes.FORBIDDEN)
+        }
 
-        if(booking.status === EXPIRED){                                                        //Maybe I don't need this
+        if(booking.status === EXPIRED){
             throw new AppError('Booking already Expired!', StatusCodes.GONE)
         }
 
         const status = expired? EXPIRED : CANCELLED;
 
-        /* if(!expired) {
-             const refundRespponse = RefundFarePaymentMimicFunction()
-             and allow below code if refundRespponse = true
-        }
-        */
-
         await bookingRepository.update(bookingId, { status } , t );
+
+        // API Call to revert the Seat capacity in Airplane after cancellation (WITHIN transaction)
+        const selectedSeats = `${booking.Economy}-${booking.Business}-${booking.FirstClass}`
+        const endpoint = new URL(
+            `/api/flights/${booking.flightId}/seats/`,
+            ServerConfig.FLIGHT_SERVICE
+        );
+      
+        endpoint.searchParams.set('decrement', '0');
+        const payload = {
+            travelClass: selectedSeats
+        };
+      
+        const response = await axios.patch(endpoint.toString(), payload);
+      
+        // Validate seat revert response
+        if(!response?.data?.success){
+            throw new AppError('Seats not reverted. Cancellation failed!', StatusCodes.FAILED_DEPENDENCY)
+        }
+
         await t.commit();
+        return "Booking cancelled successfully!";
 
         } catch (error) {
         if(error.message === `Resource not found for the ID ${bookingId}`) error.message = 'Booking not found!'
         await t.rollback();
         throw error
     }
-
-    // API Call to revert the Seat capacity in Airplane after cancellation
-        try {
-            const selectedSeats = `${booking.Economy}-${booking.Business}-${booking.FirstClass}`
-            const endpoint = new URL(
-            `/api/flights/${booking.flightId}/seats/`,
-            ServerConfig.FLIGHT_SERVICE
-            );
-          
-            endpoint.searchParams.set('decrement', '0');
-            const payload = {
-            travelClass: selectedSeats
-            };
-          
-            const response = await axios.patch(endpoint.toString(), payload);
-          
-        // Processing the cancellation response ^^
-            if(!response?.data?.success){
-            throw new AppError('Seats not reverted', StatusCodes.FAILED_DEPENDENCY)
-       }
-        } catch (error) {
-            console.log(error)
-        }
-        
-       return "Booking cancelled successfully!";
 }
 
 // to Expire the bookings that are unprocessed if not paid within 10 minutes
@@ -218,6 +280,9 @@ const expireUnprocessedBookings = async() => {
 }
 
 module.exports = {
+    getBookingById,
+    getAllBookingsForUser,
+    getAllBookings,
     createBooking,
     makePayment,
     cancelBooking,

@@ -1,5 +1,6 @@
 const { StatusCodes } = require('http-status-codes');
-const { Error } = require('../utils/common-utils');
+const { Error, Enums } = require('../utils/common-utils'); // Updated import
+const { ADMIN, STAFF, CUSTOMER } = Enums.User_Profile; // Destructure all relevant roles
 
 const isAuthenticated = async(req, res, next) => {
     // Assuming authentication has already happened at the API Gateway
@@ -20,6 +21,25 @@ const isAuthenticated = async(req, res, next) => {
     next();
 };
 
+// Generic role-based authorization middleware
+const authorizeRoles = (...allowedRoles) => {
+    return (req, res, next) => {
+        const userRole = req.headers['x-user-role'];
+        console.log(userRole)
+        if (!userRole || !allowedRoles.includes(userRole)) {
+            return res.status(StatusCodes.FORBIDDEN).json({
+                ...Error,
+                message: "Forbidden: You do not have the necessary permissions to access this resource!",
+                error: {
+                    message: "Insufficient role privileges.",
+                },
+            });
+        }
+        next();
+    };
+};
+
 module.exports = {
-  isAuthenticated
+  isAuthenticated,
+  authorizeRoles // Export the generic middleware
 };

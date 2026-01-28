@@ -36,17 +36,14 @@ class CrudFunctions {
     }
   }
 
-  async findAll(options = {}) {
+  async findAll(options = {}) {     //Adding options to the findAll method for custom queries
     try {
       const response = await this.model.findAll(options);
       return response;
     } catch (error) {
-      console.log(`Error retrieving data from ${this.model.name}`);
       throw error;
     }
   }
-
-
   async update(id, data) {
     try {
       const response = await this.model.update(data, {

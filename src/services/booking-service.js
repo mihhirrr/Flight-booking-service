@@ -21,7 +21,50 @@ const getBookingById = async(bookingId, userId, role) => {
         if(booking.userId !== userId && role !== ADMIN && role !== STAFF) {
             throw new AppError('Unauthorized: You are not authorized to access this booking!', StatusCodes.FORBIDDEN);
         }
-        return booking;
+
+        let flightDetails = null;
+        try {
+            const flightResponse = await axios.get(
+                `${ServerConfig.FLIGHT_SERVICE}api/flights/${booking.flightId}`
+            );
+            flightDetails = flightResponse.data.data;
+        } catch (flightError) {
+            console.warn(`Could not fetch flight details: `, flightError.message);
+        }
+
+        return {
+            ...booking.toJSON(),
+            flightDetails: flightDetails
+        };
+
+    } catch (error) {
+        throw error;
+    }
+}
+
+const getAllBookingsForUser = async(userId) => {
+    try {
+        const bookings = await bookingRepository.findAll({
+            where: { userId }
+        });
+        return bookings;
+    } catch (error) {
+        throw error;
+    }
+}
+
+const getAllBookings = async(bookingStateFilter = undefined) => {
+    try {
+        let queryOptions = {}
+        if(bookingStateFilter){
+            queryOptions = {
+                status : bookingStateFilter
+            }
+        }
+        const bookings = await bookingRepository.findAll({
+            where: queryOptions
+        });
+        return bookings;
     } catch (error) {
         throw error;
     }
@@ -159,16 +202,15 @@ const makePayment = async (bookingId, seats, userId) => {
     }
 }
 
-const cancelBooking = async (bookingId, userId, expired = false) =>{
+const cancelBooking = async (bookingId, userId, role, expired = false) =>{
     const t = await db.sequelize.transaction();
     let booking;
 
     try {
         booking = await bookingRepository.find(bookingId)
-
-        // Verify booking belongs to authenticated user (skip if expired is true - internal call)
-        if (!expired && booking.userId !== userId) {
-            throw new AppError('Unauthorized: This booking does not belong to you!', 
+        // Verify booking belongs to authenticated user or is an admin or staff
+        if (!expired && booking.userId !== userId && role !== ADMIN && role !== STAFF) {
+            throw new AppError('Unauthorized: You are not authorized to cancel this booking!', 
                 StatusCodes.FORBIDDEN)
         }
 
@@ -239,6 +281,8 @@ const expireUnprocessedBookings = async() => {
 
 module.exports = {
     getBookingById,
+    getAllBookingsForUser,
+    getAllBookings,
     createBooking,
     makePayment,
     cancelBooking,
